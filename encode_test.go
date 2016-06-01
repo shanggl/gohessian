@@ -126,3 +126,22 @@ func Test_encode_map(t *testing.T) {
   }
 
 }
+
+type Foo struct{
+	Type string
+	Tx string `key:tx`
+	Version string `key:version`
+
+}
+
+func Test_encode_Struct(t * testing.T){
+	var s Foo
+	s=Foo{"com.aaa.bbb","cif_individual_001","1.0"}
+
+	b,err:=Encode(&s)
+	if err!=nil || b==nil{
+		t.Fail()
+	}
+	log.Println("------------------------------")
+	log.Println("value =",b)
+}

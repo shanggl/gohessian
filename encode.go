@@ -6,7 +6,9 @@ import (
   "runtime"
   "time"
   "unicode/utf8"
-  "gohessian/util"
+  "reflect"
+  "github.com/shanggl/gohessian/util"
+  "github.com/fatih/structs"
 )
 
 /*
@@ -20,6 +22,10 @@ time.Time
 map[interface{}]interface{}
 nil
 bool
+*/
+/* shanggl
+add marshal /unmashal struct object support
+add Array support
 */
 
 type Encoder struct {
@@ -79,7 +85,23 @@ func Encode(v interface{}) (b []byte, err error) {
     b, err = encode_map(v.(map[Any]Any))
 
   default:
-    panic("unknow type")
+    t:=reflect.TypeOf(v)
+    if reflect.Ptr==t.Kind(){
+	tmp:=reflect.ValueOf(v).Elem()
+	t=reflect.TypeOf(tmp)
+    }
+    switch k:=t.Kind();k{
+    case reflect.Struct:
+	b,err=marshal(v)
+/* error */
+    case reflect.Slice,reflect.Array:
+	b,err=encode_list(v.([] Any))
+    case reflect.Map:
+	b,err=encode_map(v.(map[Any]Any))
+    default:
+	log.Printf("type not Support! %T",t.Kind())
+    	panic("unknow type")
+    }
   }
   if ENCODER_DEBUG {
     log.Println(util.SprintHex(b))
@@ -302,3 +324,71 @@ func encode_map(v map[Any]Any) (b []byte, err error) {
   b = append(b, 'z')
   return
 }
+
+/* 
+example : 
+type Request struct{
+	Type	string `key:type`
+	Tx string `key:tx`
+	Version string `key:version`
+	Args [] gohessian.Any `key:args`
+
+}
+
+req :=&Request{"com.rb.owk.wolfs.ebox.Request",
+		"cif_individual_0026_0005",
+		"1.0",
+		nil}
+
+
+*/
+	
+
+// struct marshal to map
+
+func marshal (v Any) (b []byte,err error) {
+	s:=structs.New(v)
+	f,ok:= s.FieldOk("Type")// mast contains Type Field to convert to object
+	if !ok{
+		return
+	}
+
+//encode TypeName
+	b=append(b,'M')
+	b=append(b,'t')
+	typeName:=f.Tag("key")
+	
+	var tmp_v []byte
+	typeNameLen:=len(typeName)
+	if tmp_v, err = util.PackInt16(int16(typeNameLen));tmp_v!= nil {
+  		b = append(b, tmp_v...)
+	}
+	b = append(b,[]byte(typeName)... )
+	
+//encode the Fields
+    for _,f:=range s.Fields(){
+	if f.Name()=="Type"{
+		continue  //jump type Field
+	}else{
+		tag:=f.Tag("key")//mast has a key tag value is the object properties"
+		tmp_v,err=encode_string(tag)
+		if err==nil && v!=nil{
+			b=append(b,tmp_v...)
+		}else{
+			return nil,err
+		}
+		
+		tmp_v,err=Encode(f.Value())
+		if err==nil && v!=nil{
+			b=append(b,tmp_v...)
+		}else {
+			return nil,err
+		}
+
+	}//end of else
+
+	}//end of for 
+	b=append(b,'z')
+	return 
+}
+
