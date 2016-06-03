@@ -33,7 +33,7 @@ type Encoder struct {
 
 const (
   CHUNK_SIZE    = 0x8000
-  ENCODER_DEBUG = false
+  ENCODER_DEBUG = false	
 )
 
 func init() {
@@ -93,7 +93,6 @@ func Encode(v interface{}) (b []byte, err error) {
     switch k:=t.Kind();k{
     case reflect.Struct:
 	b,err=marshal(v)
-/* error */
     case reflect.Slice,reflect.Array:
 	b,err=encode_list(v.([] Any))
     case reflect.Map:
@@ -311,8 +310,6 @@ func encode_map(v map[Any]Any) (b []byte, err error) {
   b = append(b, 'M')
   for k, v := range v {
     if tmp_k, err = Encode(k); err != nil {
-      b = nil
-      return
     }
     if tmp_v, err = Encode(v); err != nil {
       b = nil
@@ -326,29 +323,18 @@ func encode_map(v map[Any]Any) (b []byte, err error) {
 }
 
 /* 
-example : 
-type Request struct{
-	Type	string `key:type`
-	Tx string `key:tx`
-	Version string `key:version`
-	Args [] gohessian.Any `key:args`
-
-}
-
-req :=&Request{"com.rb.owk.wolfs.ebox.Request",
-		"cif_individual_0026_0005",
-		"1.0",
-		nil}
-
-
+	see example 
 */
 	
 
 // struct marshal to map
 
 func marshal (v Any) (b []byte,err error) {
+
 	s:=structs.New(v)
-	f,ok:= s.FieldOk("Type")// mast contains Type Field to convert to object
+	var tmp_v []byte
+
+	f,ok:= s.FieldOk("Type")	// mast contains Type Field to convert to object
 	if !ok{
 		return
 	}
@@ -356,21 +342,28 @@ func marshal (v Any) (b []byte,err error) {
 //encode TypeName
 	b=append(b,'M')
 	b=append(b,'t')
+
+
 	typeName:=f.Tag("key")
-	
-	var tmp_v []byte
-	typeNameLen:=len(typeName)
-	if tmp_v, err = util.PackInt16(int16(typeNameLen));tmp_v!= nil {
+	var s_buf = *bytes.NewBufferString(typeName)
+	typeNameLen:=utf8.RuneCount(s_buf.Bytes())
+	if tmp_v, err = util.PackUint16(uint16(typeNameLen));tmp_v!= nil {
   		b = append(b, tmp_v...)
 	}
-	b = append(b,[]byte(typeName)... )
+//encode typeName Using utf8 
+
+	for i := 0; i < typeNameLen; i++ {
+       		if r, s, err := s_buf.ReadRune(); s > 0 && err == nil {
+       		   b = append(b, []byte(string(r))...)
+        	}
+	}
 	
 //encode the Fields
     for _,f:=range s.Fields(){
 	if f.Name()=="Type"{
 		continue  //jump type Field
 	}else{
-		tag:=f.Tag("key")//mast has a key tag value is the object properties"
+		tag:=f.Tag("key")		//mast has a key tag value is the object properties"
 		tmp_v,err=encode_string(tag)
 		if err==nil && v!=nil{
 			b=append(b,tmp_v...)
@@ -391,4 +384,6 @@ func marshal (v Any) (b []byte,err error) {
 	b=append(b,'z')
 	return 
 }
+
+
 
