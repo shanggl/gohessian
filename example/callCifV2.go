@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"github.com/shanggl/gohessian/client"
 	"github.com/shanggl/gohessian"
 )
 
 type QueryUserBaseInfoByUserNoRequest struct{
-	Type	string		`key:"com.lz.cif.individual.queryinfo.facaed.dto.QueryUserBaseInfoByUserNoRequest"`
-	ReqSysDate 	int64	`key:"reqSysDate"`
+	Type	string	`key:"com.lz.cif.individual.queryinfo.facade.dto.QueryUserBaseInfoByUserNoRequest"`
+	ReqSysDate 	time.Time	`key:"reqSysDate"`
 	OperationCode 	string	`key:"operationCode"`
 	OperationSys 	string	`key:"operationSys"`
 	OperBy		string	`key:"operBy"`
@@ -33,8 +34,10 @@ type UserQueryRequest struct{
 
 func testQueryUserBaseInfo(userId string){
 	//basic info
-	url:="http://192.168.9.86/epbox-pcif"
+	//url:="http://192.168.9.98:8380/pcif-web/ebox"
+	url:="http://192.168.8.62:8180/pcif-web/ebox"
 	method:="invoke"
+
 	var user QueryUserBaseInfoByUserNoRequest
 	user.FlowNo="10010101010101"//flowNO
 	user.OperationSys="" //sysType
@@ -43,7 +46,7 @@ func testQueryUserBaseInfo(userId string){
 
 
 	var	req UserQueryRequest
-	req.Tx="cif_individial_0026_005"
+	req.Tx="cif_individual_0026_0001"
 	req.Version="1.0"
 	req.Args=append(req.Args,user)
 	
@@ -59,5 +62,5 @@ func testQueryUserBaseInfo(userId string){
 }
 
 func main(){
-	testQueryUserBaseInfo("100301323232323")
+	testQueryUserBaseInfo("110000001840808")
 }
