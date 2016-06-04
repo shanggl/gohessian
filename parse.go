@@ -5,7 +5,7 @@ import (
   "fmt"
   "io"
   "time"
-  "gohessian/util"
+  "github.com/shanggl/gohessian/util"
 )
 
 /*
