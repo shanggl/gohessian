@@ -2,13 +2,13 @@ package gohessian
 
 import (
   "bytes"
+  "strings"
   "log"
   "runtime"
   "time"
   "unicode/utf8"
   "reflect"
   "github.com/shanggl/gohessian/util"
-  "github.com/fatih/structs"
 )
 
 /*
@@ -33,11 +33,11 @@ type Encoder struct {
 
 const (
   CHUNK_SIZE    = 0x8000
-  ENCODER_DEBUG = false	
+  ENCODER_DEBUG = true
 )
 
 func init() {
-  _, filename, _, _ := runtime.Caller(1)
+  _, filename, _, _ := runtime.Caller(0)
   if ENCODER_DEBUG {
     log.SetPrefix(filename + "\n")
   }
@@ -78,7 +78,7 @@ func Encode(v interface{}) (b []byte, err error) {
   case nil:
     b, err = encode_null(v)
 
-  case []Any:
+  case [] Any:
     b, err = encode_list(v.([]Any))
 
   case map[Any]Any:
@@ -98,7 +98,7 @@ func Encode(v interface{}) (b []byte, err error) {
     case reflect.Map:
 	b,err=encode_map(v.(map[Any]Any))
     default:
-	log.Printf("type not Support! %T",t.Kind())
+	log.Printf("type not Support! %s",t.Kind().String())
     	panic("unknow type")
     }
   }
@@ -325,65 +325,75 @@ func encode_map(v map[Any]Any) (b []byte, err error) {
 /* 
 	see example 
 */
-	
 
 // struct marshal to map
 
 func marshal (v Any) (b []byte,err error) {
 
-	s:=structs.New(v)
 	var tmp_v []byte
+	var s=reflect.ValueOf(v)
+	var t=reflect.TypeOf(v)
 
-	f,ok:= s.FieldOk("Type")	// mast contains Type Field to convert to object
-	if !ok{
+//check Type exists
+	mt:= s.MethodByName("GetType")	// mast contains Type Field to convert to object
+	if !mt.IsValid(){ 
+		log.Printf("Dos't contains GetType !")
 		return
 	}
 
-//encode TypeName
 	b=append(b,'M')
+//encode type Name 
 	b=append(b,'t')
-
-
-	typeName:=f.Tag("key")
-	var s_buf = *bytes.NewBufferString(typeName)
+	typeName:=mt.Call([] reflect.Value{})[0]	//call return [string,]
+	var s_buf = *bytes.NewBufferString(typeName.String())
 	typeNameLen:=utf8.RuneCount(s_buf.Bytes())
 	if tmp_v, err = util.PackUint16(uint16(typeNameLen));tmp_v!= nil {
-  		b = append(b, tmp_v...)
+		b = append(b, tmp_v...)
 	}
-//encode typeName Using utf8 
-
 	for i := 0; i < typeNameLen; i++ {
-       		if r, s, err := s_buf.ReadRune(); s > 0 && err == nil {
-       		   b = append(b, []byte(string(r))...)
-        	}
+		if r, s, err := s_buf.ReadRune(); s > 0 && err == nil {
+		   b = append(b, []byte(string(r))...)
+		}
 	}
-	
 //encode the Fields
-    for _,f:=range s.Fields(){
-	if f.Name()=="Type"{
-		continue  //jump type Field
-	}else{
-		tag:=f.Tag("key")		//mast has a key tag value is the object properties"
-		tmp_v,err=encode_string(tag)
-		if err==nil && v!=nil{
+	for i:=0 ;i < t.NumMethod();i++ {
+		var tmp_r [] reflect.Value
+		var mi reflect.Method
+		var tmp_s string
+
+		mi=t.Method(i)
+
+		if !strings.HasPrefix(mi.Name,"Get"){
+			continue
+		}
+		if strings.EqualFold(mi.Name,"GetType"){
+			continue  //jump type Field
+		}
+	//name change GetXaa to xaa
+		if mi.Name[3]<'a' {
+			tmp_s=string(mi.Name[3]+32)
+		}else{
+			tmp_s=string(mi.Name[3])
+		}
+		tmp_v,err=encode_string(tmp_s+mi.Name[4:])
+		if err==nil && tmp_v!=nil{
 			b=append(b,tmp_v...)
 		}else{
 			return nil,err
 		}
-		
-		tmp_v,err=Encode(f.Value())
-		if err==nil && v!=nil{
+	//value
+		tmp_r=s.Method(i).Call([] reflect.Value{})//return [] reflect.Value
+		tmp_v,err=Encode(tmp_r[0].Interface()) //GetXXX returns [string,]
+		if err==nil && tmp_v!=nil{
 			b=append(b,tmp_v...)
 		}else {
 			return nil,err
 		}
 
-	}//end of else
 
 	}//end of for 
+
 	b=append(b,'z')
 	return 
 }
-
-
 

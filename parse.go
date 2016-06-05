@@ -6,6 +6,8 @@ import (
   "io"
   "time"
   "github.com/shanggl/gohessian/util"
+  "github.com/shanggl/gohessian/generator"
+  "reflect"
 )
 
 /*
@@ -194,27 +196,63 @@ func (h *Hessian) Parse() (v interface{}, err error) {
     h.append_refs(&list_chunks)
 
   case 'M': //map
-    h.read_type() //TODO 类型怎么用?
-    var map_chunks = make(map[Any]Any)
-    for h.peek_byte() != 'z' {
-      _kv, _ke := h.Parse()
-      if _ke != nil {
-        map_chunks = nil
-        err = _ke
-        return
-      }
-      _vv, _ve := h.Parse()
-      if _ve != nil {
-        map_chunks = nil
-        err = _ve
-        return
-      }
-      map_chunks[_kv] = _vv
-    }
-    h.read_byte()
-    v = map_chunks
-    h.append_refs(&map_chunks)
+    map_type:=h.read_type() //TODO 类型怎么用?
+	if !generator.HasReg(string(map_type))  { //pure Map
+	    var map_chunks = make(map[Any]Any)
+	    for h.peek_byte() != 'z' {
+	      _kv, _ke := h.Parse()
+	      if _ke != nil {
+	        map_chunks = nil
+	        err = _ke
+	        return
+	      }
+	      _vv, _ve := h.Parse()
+	      if _ve != nil {
+	        map_chunks = nil
+	        err = _ve
+	        return
+	      }
+	      map_chunks[_kv] = _vv
+	    }
+	    h.read_byte()
+	    v = map_chunks
+	    h.append_refs(&map_chunks)
+	}else{// Unmarshal Object Instance
+		var _v= generator.Gen(string(map_type))
+		for h.peek_byte() != 'z'{
+			_kv,_ke:=h.Parse()
+			if _ke !=nil{
+				_v=nil;// drop new generatored 
+				err = _ke
+				return
+			}
+			_vv,_ve:=h.Parse()
+			if _ve !=nil{
+                                _v=nil;// drop new generatored 
+                                err = _ve
+                                return
+                        }
+		        //set value of the struct     Zero will be passed
+			if nv:=reflect.ValueOf(_vv);nv.IsValid(){
+				var methodName string
+				keyName:=_kv.(string)
+				firstChar:=keyName[0]
+				if firstChar >= 'a'{	//convert to Upper
+					methodName="Set"+string(firstChar-32)+keyName[1:]
+				}else{
+					methodName="Set"+string(keyName)
+				}
 
+				var args [] reflect.Value
+				args=append(args,reflect.ValueOf(_vv))
+
+				reflect.ValueOf(_v).MethodByName(methodName).Call(args)
+			}
+		}
+		v=_v
+		h.append_refs(&_v)
+
+	}
   case 'R': //ref
     var ref_idx int32
     if ref_idx, err = util.UnpackInt32(h.next(4)); err != nil {

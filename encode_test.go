@@ -128,15 +128,32 @@ func Test_encode_map(t *testing.T) {
 }
 
 type Foo struct{
-	Type string
-	Tx string `key:tx`
-	Version string `key:version`
+	tx string
+	version string
 
+}
+
+func (f * Foo) GetType() string {
+	return "foo"
+}
+
+func (f* Foo) GetTx() string {
+	return f.tx
+}
+
+func (f* Foo) SetTx(v string ) {
+	f.tx=v
+}
+func (f * Foo) GetVersion() string {
+	return f.version
+}
+func (f * Foo) SetVersion(v string ) {
+	f.version=v
 }
 
 func Test_encode_Struct(t * testing.T){
 	var s Foo
-	s=Foo{"com.aaa.bbb","cif_individual_001","1.0"}
+	s=Foo{"cif_individual_001","1.0"}
 
 	b,err:=Encode(&s)
 	if err!=nil || b==nil{
